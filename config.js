@@ -1,7 +1,4 @@
-// Fill these in from Supabase: Project Settings -> API.
-// The anon key is meant to be public; the database rules in supabase.sql keep it safe.
-// Leave them empty and the site runs as a local preview (pigeons only on your screen).
 window.PIGEON_CONFIG = {
-  supabaseUrl: "",      // e.g. "https://abcdxyz.supabase.co"
-  supabaseAnonKey: ""   // the long "anon public" key
+  supabaseUrl: "https://zuztpnikwjnuhaesdkrl.supabase.co",
+  supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp1enRwbmlrd2pudWhhZXNka3JsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE4ODc1ODYsImV4cCI6MjEwNzQ2MzU4Nn0.yAGtX5VDAoKKDURolAnNOlDw6Jfyc-6nse5f7a2Tvco"
 };
