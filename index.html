@@ -1,0 +1,703 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pigeon Sky</title>
+<meta name="description" content="Draw a pigeon and watch it fly with everyone else's across the sky.">
+<meta property="og:title" content="Pigeon Sky">
+<meta property="og:description" content="Draw a pigeon and watch it fly with everyone else's across the sky.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='32' fill='%2386c3ee'/%3E%3Cellipse cx='28' cy='38' rx='16' ry='10' fill='%237d8ba3'/%3E%3Ccircle cx='44' cy='26' r='8' fill='%237d8ba3'/%3E%3Cpath d='M51 25l8 3-8 3z' fill='%23e8762e'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&family=Figtree:wght@400;600;700&display=swap">
+<style>
+/* Layout: one full-bleed sky canvas; small floating paper cards for title, hint and the drawing pad. Single daytime look by choice. */
+:root {
+  color-scheme: light;
+  --sky-top: #3d86d1;
+  --sky-mid: #86c3ee;
+  --sky-low: #d8eefa;
+  --paper: #fffdf7;
+  --ink: #1f2a3a;
+  --ink-soft: #5b6880;
+  --slate: #7d8ba3;          /* pigeon grey */
+  --neck: #4f8f6b;           /* iridescent neck green */
+  --accent: #e8762e;         /* pigeon-foot orange */
+  --accent-ink: #ffffff;
+  --line: #d9dfe8;
+  --display: "Bagel Fat One", "Arial Rounded MT Bold", system-ui, sans-serif;
+  --body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--sky-mid); color: var(--ink); font-family: var(--body); font-size: 15px; overflow: hidden; }
+#sky { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: manipulation; }
+
+.card { background: var(--paper); border-radius: 14px; box-shadow: 0 6px 24px rgba(31,42,58,.18), 0 1px 0 rgba(31,42,58,.06); }
+
+#masthead {
+  position: fixed; top: calc(env(safe-area-inset-top, 0px) + 16px); left: 16px; right: 16px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  pointer-events: none;
+}
+#masthead > * { pointer-events: auto; }
+.brand { padding: 10px 16px 10px 14px; display: flex; flex-direction: column; gap: 2px; }
+.brand h1 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 28px; line-height: 1; color: var(--ink); letter-spacing: .01em; }
+.brand h1 span { color: var(--accent); }
+.brand p { margin: 0; font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+.btn {
+  font: 700 15px/1 var(--body); border: 0; border-radius: 999px; padding: 13px 20px; cursor: pointer;
+  background: var(--accent); color: var(--accent-ink); box-shadow: 0 4px 0 #b9561a, 0 8px 20px rgba(31,42,58,.2);
+  transition: transform .08s ease, box-shadow .08s ease;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #b9561a, 0 4px 10px rgba(31,42,58,.2); }
+.btn:focus-visible, .tool:focus-visible, .swatch:focus-visible, input:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+.btn[disabled] { opacity: .55; cursor: not-allowed; transform: none; }
+.btn.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 2px var(--line); }
+.btn.ghost:active { box-shadow: inset 0 0 0 2px var(--line); }
+
+#hint {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  max-width: calc(100% - 32px); padding: 9px 16px; font-size: 13px; color: var(--ink-soft);
+  text-align: center; text-wrap: balance; pointer-events: none;
+}
+#hint b { color: var(--ink); }
+#empty {
+  position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%);
+  max-width: min(360px, calc(100% - 32px)); padding: 18px 22px; text-align: center; pointer-events: none;
+}
+#empty h2 { margin: 0 0 6px; font-family: var(--display); font-weight: 400; font-size: 22px; }
+#empty p { margin: 0; color: var(--ink-soft); line-height: 1.45; }
+
+/* Artist card */
+#tag {
+  position: fixed; width: 230px; padding: 12px; display: flex; gap: 12px; align-items: center;
+  z-index: 5; transform: translate(-50%, calc(-100% - 18px));
+}
+#tag::after { content: ""; position: absolute; left: 50%; bottom: -7px; width: 14px; height: 14px; background: var(--paper); transform: translateX(-50%) rotate(45deg); border-radius: 2px; }
+#tag img { width: 64px; height: 48px; object-fit: contain; background: var(--sky-low); border-radius: 8px; flex: none; }
+#tag .who { min-width: 0; }
+#tag .eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-soft); }
+#tag .name { font-weight: 700; font-size: 16px; overflow-wrap: anywhere; }
+#tag .when { font-size: 12px; color: var(--ink-soft); }
+#tag .remove { margin-top: 4px; background: none; border: 0; padding: 0; color: #b5382b; font: 600 12px var(--body); cursor: pointer; text-decoration: underline; }
+
+/* Drawing pad */
+#pad-wrap { position: fixed; inset: 0; background: rgba(31,42,58,.35); display: grid; place-items: center; padding: 16px; z-index: 10; }
+#pad { width: min(640px, 100%); max-height: calc(100% - 8px); overflow: auto; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+#pad header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+#pad h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 24px; }
+#pad header p { margin: 0; color: var(--ink-soft); font-size: 13px; }
+.board { position: relative; border-radius: 12px; overflow: hidden; background: linear-gradient(var(--sky-mid), var(--sky-low)); box-shadow: inset 0 0 0 2px var(--line); aspect-ratio: 3 / 2; max-width: 100%; }
+.board canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+.board .arrow { position: absolute; right: 12px; bottom: 10px; font-size: 12px; color: rgba(31,42,58,.55); pointer-events: none; font-weight: 600; }
+.tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--paper); box-shadow: 0 0 0 2px var(--line); cursor: pointer; padding: 0; }
+.swatch[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--ink); }
+.sep { width: 1px; height: 26px; background: var(--line); margin: 0 4px; }
+.tool { font: 600 13px var(--body); border: 0; border-radius: 999px; padding: 8px 12px; background: #eef1f6; color: var(--ink); cursor: pointer; }
+.tool[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.row label { font-weight: 600; font-size: 13px; }
+.row input[type=text] { flex: 1 1 180px; min-width: 0; font: 15px var(--body); padding: 11px 14px; border-radius: 10px; border: 2px solid var(--line); background: #fff; color: var(--ink); }
+.actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+#msg { font-size: 13px; color: #b5382b; min-height: 1em; margin: 0; }
+
+@media (max-width: 520px) {
+  .brand h1 { font-size: 22px; }
+  .btn { padding: 11px 16px; font-size: 14px; }
+}
+</style>
+</head>
+<body>
+
+<canvas id="sky" aria-label="A sky full of drawn pigeons. Tap in front of a pigeon to spook it, tap a pigeon to see who drew it."></canvas>
+
+<div id="masthead">
+  <div class="brand card">
+    <h1>Pigeon <span>Sky</span></h1>
+    <p id="count">Looking up…</p>
+  </div>
+  <button class="btn" id="open-pad" type="button">Draw a pigeon</button>
+</div>
+
+<div id="empty" class="card" hidden>
+  <h2>The sky is empty</h2>
+  <p>Only a few wild pigeons so far. Draw the first one and it joins the flock for everyone who visits.</p>
+</div>
+
+<div id="hint" class="card">Tap <b>in front</b> of a pigeon to spook it. Tap <b>on</b> a pigeon to meet its artist.</div>
+
+<div id="tag" class="card" hidden>
+  <img id="tag-img" alt="">
+  <div class="who">
+    <div class="eyebrow" id="tag-eyebrow">Drawn by</div>
+    <div class="name" id="tag-name"></div>
+    <div class="when" id="tag-when"></div>
+    <button class="remove" id="tag-remove" type="button" hidden>Remove this pigeon</button>
+  </div>
+</div>
+
+<div id="pad-wrap" hidden>
+  <div id="pad" class="card" role="dialog" aria-modal="true" aria-labelledby="pad-title">
+    <header>
+      <h2 id="pad-title">Draw your pigeon</h2>
+      <p>Face it to the right. It will fly that way.</p>
+    </header>
+    <div class="board">
+      <canvas id="draw" width="900" height="600"></canvas>
+      <div class="arrow">flies this way →</div>
+    </div>
+    <div class="tools" id="swatches"></div>
+    <div class="tools">
+      <button class="tool" id="size-s" type="button" aria-pressed="false">Fine</button>
+      <button class="tool" id="size-m" type="button" aria-pressed="true">Medium</button>
+      <button class="tool" id="size-l" type="button" aria-pressed="false">Thick</button>
+      <span class="sep"></span>
+      <button class="tool" id="eraser" type="button" aria-pressed="false">Eraser</button>
+      <button class="tool" id="undo" type="button">Undo</button>
+      <button class="tool" id="clear" type="button">Clear</button>
+    </div>
+    <div class="row">
+      <label for="artist">Sign it</label>
+      <input type="text" id="artist" maxlength="40" placeholder="Your name or alias" autocomplete="nickname">
+    </div>
+    <p id="msg" role="status"></p>
+    <div class="actions">
+      <button class="btn ghost" id="cancel" type="button">Cancel</button>
+      <button class="btn" id="release" type="button">Let it fly</button>
+    </div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const sky = $("sky"), ctx = sky.getContext("2d");
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let W = 0, H = 0, DPR = 1;
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = innerWidth; H = innerHeight;
+    sky.width = Math.round(W * DPR); sky.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    buildSkyGradient();
+  }
+
+  /* ---------- Sky & clouds ---------- */
+  let skyGrad;
+  const css = getComputedStyle(document.documentElement);
+  const tok = (n) => css.getPropertyValue(n).trim();
+  function buildSkyGradient() {
+    skyGrad = ctx.createLinearGradient(0, 0, 0, H);
+    skyGrad.addColorStop(0, tok("--sky-top"));
+    skyGrad.addColorStop(0.55, tok("--sky-mid"));
+    skyGrad.addColorStop(1, tok("--sky-low"));
+  }
+
+  function makeCloud(size) {
+    const w = size, h = size * 0.55;
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    const g = c.getContext("2d");
+    const puffs = 6 + Math.floor(Math.random() * 5);
+    const pts = [];
+    for (let i = 0; i < puffs; i++) {
+      const t = i / (puffs - 1);
+      const r = h * (0.22 + Math.random() * 0.18) * (1 - Math.abs(t - 0.5) * 0.8);
+      pts.push({ x: w * (0.15 + t * 0.7), y: h * 0.62 - r * (0.4 + Math.random() * 0.5), r });
+    }
+    // shadowed underside
+    g.fillStyle = "rgba(170,195,222,0.9)";
+    pts.forEach(p => { g.beginPath(); g.arc(p.x, p.y + p.r * 0.18, p.r, 0, 7); g.fill(); });
+    g.fillStyle = "#ffffff";
+    pts.forEach(p => { g.beginPath(); g.arc(p.x, p.y, p.r, 0, 7); g.fill(); });
+    // flat base
+    g.globalCompositeOperation = "destination-out";
+    g.fillRect(0, h * 0.8, w, h);
+    return c;
+  }
+
+  const clouds = [];
+  function seedClouds() {
+    clouds.length = 0;
+    const layers = [
+      { n: 5, size: [160, 260], speed: 4, alpha: 0.65, depth: 0 },
+      { n: 4, size: [240, 380], speed: 9, alpha: 0.9, depth: 1 },
+      { n: 2, size: [360, 520], speed: 18, alpha: 0.82, depth: 2 },
+    ];
+    layers.forEach(L => {
+      for (let i = 0; i < L.n; i++) {
+        const s = L.size[0] + Math.random() * (L.size[1] - L.size[0]);
+        clouds.push({ img: makeCloud(s), x: Math.random() * (innerWidth + s) - s, yf: Math.random(), speed: L.speed * (0.7 + Math.random() * 0.6), alpha: L.alpha, depth: L.depth });
+      }
+    });
+  }
+  function drawClouds(depth, dt) {
+    for (const c of clouds) {
+      if (c.depth !== depth) continue;
+      if (!reduceMotion) c.x += c.speed * dt;
+      if (c.x > W + 20) { c.x = -c.img.width - Math.random() * 200; c.yf = Math.random(); }
+      const y = (depth === 2 ? 0.55 + c.yf * 0.4 : 0.08 + c.yf * 0.75) * H - c.img.height / 2;
+      ctx.globalAlpha = c.alpha;
+      ctx.drawImage(c.img, c.x, y);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /* ---------- Wild pigeons (built-in, no artist) ---------- */
+  function makeWildPigeon(hue) {
+    const c = document.createElement("canvas"); c.width = 220; c.height = 150;
+    const g = c.getContext("2d");
+    g.lineJoin = g.lineCap = "round"; g.lineWidth = 5; g.strokeStyle = "#2a3140";
+    // tail
+    g.fillStyle = "#5e6a80";
+    g.beginPath(); g.moveTo(40, 82); g.lineTo(6, 70); g.lineTo(8, 100); g.closePath(); g.fill(); g.stroke();
+    // body
+    g.fillStyle = hue;
+    g.beginPath(); g.ellipse(100, 88, 66, 36, -0.08, 0, 7); g.fill(); g.stroke();
+    // neck sheen
+    g.fillStyle = "#4f8f6b";
+    g.beginPath(); g.ellipse(150, 70, 22, 24, 0.3, 0, 7); g.fill();
+    g.fillStyle = "#8a5fa3";
+    g.beginPath(); g.ellipse(146, 80, 14, 12, 0.3, 0, 7); g.fill();
+    // head
+    g.fillStyle = hue;
+    g.beginPath(); g.arc(170, 52, 22, 0, 7); g.fill(); g.stroke();
+    // beak
+    g.fillStyle = "#e8762e";
+    g.beginPath(); g.moveTo(190, 48); g.lineTo(212, 56); g.lineTo(190, 60); g.closePath(); g.fill(); g.stroke();
+    // eye
+    g.fillStyle = "#e8762e"; g.beginPath(); g.arc(176, 47, 6, 0, 7); g.fill();
+    g.fillStyle = "#111"; g.beginPath(); g.arc(177, 47, 3, 0, 7); g.fill();
+    // wing
+    g.fillStyle = "#9aa6ba";
+    g.beginPath(); g.moveTo(70, 80); g.quadraticCurveTo(110, 10, 150, 72); g.quadraticCurveTo(110, 96, 70, 80); g.fill(); g.stroke();
+    g.strokeStyle = "#2a3140"; g.lineWidth = 4;
+    g.beginPath(); g.moveTo(92, 66); g.lineTo(122, 70); g.moveTo(96, 54); g.lineTo(126, 60); g.stroke();
+    // feet
+    g.strokeStyle = "#e8762e"; g.lineWidth = 5;
+    g.beginPath(); g.moveTo(96, 122); g.lineTo(90, 138); g.moveTo(112, 122); g.lineTo(110, 140); g.stroke();
+    return c;
+  }
+
+  /* ---------- Birds ---------- */
+  const birds = new Map(); // id -> bird
+  
+
+  function spawnBird(id, img, meta, opts = {}) {
+    const depth = 0.65 + Math.random() * 0.5;
+    const ar = (img.naturalHeight || img.height) / (img.naturalWidth || img.width) || 0.66;
+    const w = Math.max(60, Math.min(130, 95 * depth));
+    const dir = opts.dir ?? (Math.random() < 0.5 ? 1 : -1);
+    const b = {
+      id, img, meta,
+      w, h: w * ar,
+      x: opts.x ?? Math.random() * W,
+      baseY: opts.y ?? (0.18 + Math.random() * 0.62) * H,
+      y: 0,
+      dir,
+      speed: (34 + Math.random() * 30) * depth,
+      boost: opts.boost ?? 0,
+      vy: 0,
+      phase: Math.random() * 10,
+      flapRate: 7 + Math.random() * 3,
+      bobAmp: 8 + Math.random() * 14,
+      bobRate: 0.5 + Math.random() * 0.6,
+      depth,
+      hold: 0,
+    };
+    b.y = b.baseY;
+    birds.set(id, b);
+    return b;
+  }
+
+  const wild = [];
+  function addWild() {
+    ["#a8b3c6", "#8d99ae", "#b9c2d1"].forEach((hue, i) => {
+      const b = spawnBird("wild-" + i, makeWildPigeon(hue), { wild: true });
+      wild.push(b);
+    });
+  }
+
+  function step(b, dt, t) {
+    if (b === selected) { b.hold = Math.min(1, b.hold + dt * 3); } else { b.hold = Math.max(0, b.hold - dt * 2); }
+    const slow = 1 - b.hold * 0.85;
+    const v = (b.speed + b.boost) * slow;
+    b.boost *= Math.pow(0.35, dt);
+    b.x += b.dir * v * dt;
+    b.baseY += b.vy * dt;
+    b.vy *= Math.pow(0.3, dt);
+    b.baseY = Math.max(70, Math.min(H - 60, b.baseY));
+    b.phase += dt * b.flapRate * (1 + b.boost / 80);
+    b.y = b.baseY + Math.sin(t * b.bobRate + b.phase * 0.05) * b.bobAmp;
+    const m = b.w + 20;
+    if (b.dir > 0 && b.x > W + m) { b.x = -m; b.baseY = (0.15 + Math.random() * 0.65) * H; }
+    if (b.dir < 0 && b.x < -m) { b.x = W + m; b.baseY = (0.15 + Math.random() * 0.65) * H; }
+  }
+
+  function drawBird(b) {
+    const flap = reduceMotion ? 0 : Math.sin(b.phase);
+    ctx.save();
+    ctx.translate(b.x, b.y - flap * 3);
+    ctx.rotate(b.dir * (b.vy * 0.002) + flap * 0.03 * b.dir);
+    ctx.scale(b.dir, 1 + flap * 0.09);
+    if (b === selected || b.meta.mine) {
+      ctx.shadowColor = b === selected ? "rgba(255,255,255,0.95)" : "rgba(232,118,46,0.55)";
+      ctx.shadowBlur = b === selected ? 22 : 12;
+    }
+    ctx.drawImage(b.img, -b.w / 2, -b.h / 2, b.w, b.h);
+    ctx.restore();
+  }
+
+  /* ---------- Click: spook or inspect ---------- */
+  const ripples = [];
+  let selected = null;
+
+  function hitBird(x, y) {
+    let best = null, bestD = Infinity;
+    for (const b of birds.values()) {
+      const pad = 8;
+      if (Math.abs(x - b.x) < b.w / 2 + pad && Math.abs(y - b.y) < b.h / 2 + pad) {
+        const d = Math.hypot(x - b.x, y - b.y);
+        if (d < bestD) { bestD = d; best = b; }
+      }
+    }
+    return best;
+  }
+
+  sky.addEventListener("pointerdown", (e) => {
+    const x = e.clientX, y = e.clientY;
+    const hit = hitBird(x, y);
+    if (hit) { select(hit); return; }
+    select(null);
+    ripples.push({ x, y, r: 6, a: 1 });
+    let spooked = 0;
+    for (const b of birds.values()) {
+      const dx = x - b.x, dy = y - b.y;
+      const ahead = Math.sign(dx) === b.dir;
+      const reach = 230 + b.w;
+      if (ahead && Math.abs(dx) < reach && Math.abs(dy) < 150) {
+        b.dir *= -1;
+        b.boost = 200 + Math.random() * 90;
+        b.vy = (dy > 0 ? -1 : 1) * (60 + Math.random() * 80);
+        b.phase += 1.5;
+        spooked++;
+      }
+    }
+    if (spooked) dismissHint();
+  });
+
+  let hintGone = false;
+  function dismissHint() {
+    if (hintGone) return; hintGone = true;
+    setTimeout(() => { $("hint").hidden = true; }, 2500);
+  }
+
+  function ago(ts) {
+    const s = Math.max(1, Math.round((Date.now() - ts) / 1000));
+    if (s < 60) return "Took off just now";
+    const m = Math.round(s / 60); if (m < 60) return `Took off ${m} min ago`;
+    const h = Math.round(m / 60); if (h < 48) return `Took off ${h} hr ago`;
+    const d = Math.round(h / 24); return `Took off ${d} days ago`;
+  }
+
+  function select(b) {
+    selected = b;
+    const tag = $("tag");
+    if (!b) { tag.hidden = true; return; }
+    const img = $("tag-img");
+    img.src = b.img instanceof HTMLCanvasElement ? b.img.toDataURL() : b.img.src;
+    if (b.meta.wild) {
+      $("tag-eyebrow").textContent = "Wild pigeon";
+      $("tag-name").textContent = "Nobody drew this one";
+      $("tag-when").textContent = "It came with the sky.";
+      $("tag-remove").hidden = true;
+    } else {
+      $("tag-eyebrow").textContent = b.meta.mine ? "Drawn by you" : "Drawn by";
+      $("tag-name").textContent = b.meta.artist || "Anonymous";
+      $("tag-when").textContent = b.meta.t ? ago(b.meta.t) : "";
+      $("tag-remove").hidden = !b.meta.mine;
+    }
+    tag.hidden = false;
+    dismissHint();
+  }
+  addEventListener("keydown", (e) => { if (e.key === "Escape") { select(null); closePad(); } });
+
+  function placeTag() {
+    if (!selected) return;
+    const tag = $("tag");
+    const half = 115 + 16;
+    const x = Math.max(half, Math.min(W - half, selected.x));
+    let y = selected.y - selected.h / 2;
+    y = Math.max(tag.offsetHeight + 90, y);
+    tag.style.left = x + "px"; tag.style.top = y + "px";
+  }
+
+  /* ---------- Loop ---------- */
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const t = now / 1000;
+    ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, W, H);
+    // sun glow
+    const sg = ctx.createRadialGradient(W * 0.82, H * 0.1, 0, W * 0.82, H * 0.1, Math.max(W, H) * 0.45);
+    sg.addColorStop(0, "rgba(255,247,215,0.75)"); sg.addColorStop(1, "rgba(255,247,215,0)");
+    ctx.fillStyle = sg; ctx.fillRect(0, 0, W, H);
+
+    drawClouds(0, dt);
+    drawClouds(1, dt);
+    const list = [...birds.values()].sort((a, b) => a.depth - b.depth);
+    for (const b of list) { if (!reduceMotion || b.boost > 1) step(b, reduceMotion ? dt * 0.3 : dt, t); drawBird(b); }
+    drawClouds(2, dt);
+
+    for (let i = ripples.length - 1; i >= 0; i--) {
+      const r = ripples[i];
+      r.r += 260 * dt; r.a -= 1.8 * dt;
+      if (r.a <= 0) { ripples.splice(i, 1); continue; }
+      ctx.strokeStyle = `rgba(255,255,255,${r.a})`; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, 7); ctx.stroke();
+    }
+    placeTag();
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------- Drawing pad ---------- */
+  const draw = $("draw"), dctx = draw.getContext("2d");
+  const COLORS = [
+    ["#1f2a3a", "Charcoal"], ["#7d8ba3", "Pigeon grey"], ["#b9c2d1", "Pale grey"], ["#ffffff", "White"],
+    ["#4f8f6b", "Neck green"], ["#8a5fa3", "Neck purple"], ["#e8762e", "Beak orange"], ["#c9473a", "Red"],
+    ["#8b5a3c", "Brown"], ["#f2c94c", "Yellow"],
+  ];
+  let color = COLORS[0][0], size = 10, erasing = false;
+  const strokes = []; let cur = null;
+
+  const sw = $("swatches");
+  COLORS.forEach(([c, name], i) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "swatch"; b.style.background = c;
+    b.setAttribute("aria-label", name); b.setAttribute("aria-pressed", i === 0 ? "true" : "false");
+    b.addEventListener("click", () => {
+      color = c; erasing = false; $("eraser").setAttribute("aria-pressed", "false");
+      sw.querySelectorAll(".swatch").forEach(s => s.setAttribute("aria-pressed", s === b ? "true" : "false"));
+    });
+    sw.appendChild(b);
+  });
+  const sizes = { "size-s": 5, "size-m": 10, "size-l": 20 };
+  Object.keys(sizes).forEach(id => $(id).addEventListener("click", () => {
+    size = sizes[id];
+    Object.keys(sizes).forEach(k => $(k).setAttribute("aria-pressed", k === id ? "true" : "false"));
+  }));
+  $("eraser").addEventListener("click", () => { erasing = !erasing; $("eraser").setAttribute("aria-pressed", String(erasing)); });
+  $("undo").addEventListener("click", () => { strokes.pop(); redraw(); });
+  $("clear").addEventListener("click", () => { strokes.length = 0; redraw(); });
+
+  function padPoint(e) {
+    const r = draw.getBoundingClientRect();
+    return [(e.clientX - r.left) * draw.width / r.width, (e.clientY - r.top) * draw.height / r.height];
+  }
+  function paint(s) {
+    dctx.save();
+    dctx.globalCompositeOperation = s.erase ? "destination-out" : "source-over";
+    dctx.strokeStyle = s.color; dctx.fillStyle = s.color; dctx.lineWidth = s.size;
+    dctx.lineCap = dctx.lineJoin = "round";
+    const p = s.pts;
+    if (p.length === 1) { dctx.beginPath(); dctx.arc(p[0][0], p[0][1], s.size / 2, 0, 7); dctx.fill(); }
+    else {
+      dctx.beginPath(); dctx.moveTo(p[0][0], p[0][1]);
+      for (let i = 1; i < p.length - 1; i++) {
+        const mx = (p[i][0] + p[i + 1][0]) / 2, my = (p[i][1] + p[i + 1][1]) / 2;
+        dctx.quadraticCurveTo(p[i][0], p[i][1], mx, my);
+      }
+      dctx.lineTo(p[p.length - 1][0], p[p.length - 1][1]); dctx.stroke();
+    }
+    dctx.restore();
+  }
+  function redraw() { dctx.clearRect(0, 0, draw.width, draw.height); strokes.forEach(paint); }
+
+  draw.addEventListener("pointerdown", (e) => {
+    draw.setPointerCapture(e.pointerId);
+    cur = { color, size: erasing ? size * 2.2 : size, erase: erasing, pts: [padPoint(e)] };
+    strokes.push(cur); paint(cur);
+  });
+  draw.addEventListener("pointermove", (e) => {
+    if (!cur) return;
+    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    evs.forEach(ev => cur.pts.push(padPoint(ev)));
+    redraw();
+  });
+  const endStroke = () => { cur = null; };
+  draw.addEventListener("pointerup", endStroke);
+  draw.addEventListener("pointercancel", endStroke);
+
+  function exportPigeon() {
+    const { width: w, height: h } = draw;
+    const data = dctx.getImageData(0, 0, w, h).data;
+    let x0 = w, y0 = h, x1 = -1, y1 = -1, ink = 0;
+    for (let y = 0; y < h; y += 2) for (let x = 0; x < w; x += 2) {
+      if (data[(y * w + x) * 4 + 3] > 20) { ink++; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    }
+    if (ink < 150 || x1 - x0 < 40) return null;
+    const pad = 12;
+    x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(w, x1 + pad); y1 = Math.min(h, y1 + pad);
+    const bw = x1 - x0, bh = y1 - y0;
+    const scale = Math.min(1, 260 / bw, 180 / bh);
+    const out = document.createElement("canvas");
+    out.width = Math.max(1, Math.round(bw * scale)); out.height = Math.max(1, Math.round(bh * scale));
+    out.getContext("2d").drawImage(draw, x0, y0, bw, bh, 0, 0, out.width, out.height);
+    return out.toDataURL("image/png");
+  }
+
+  let lastFocus = null;
+  function openPad() {
+    lastFocus = document.activeElement;
+    $("pad-wrap").hidden = false; $("msg").textContent = "";
+    try { const n = localStorage.getItem("pigeon-artist"); if (n && !$("artist").value) $("artist").value = n; } catch (_) {}
+    setTimeout(() => $("artist").value ? draw.focus?.() : null, 0);
+  }
+  function closePad() { $("pad-wrap").hidden = true; lastFocus?.focus?.(); }
+  $("open-pad").addEventListener("click", openPad);
+  $("cancel").addEventListener("click", closePad);
+  $("pad-wrap").addEventListener("pointerdown", (e) => { if (e.target === $("pad-wrap")) closePad(); });
+
+  /* ---------- Shared flock (Supabase REST, polled) ---------- */
+  const CFG = window.PIGEON_CONFIG || {};
+  const API = (CFG.supabaseUrl || "").replace(/\/+$/, "");
+  const KEY = CFG.supabaseAnonKey || "";
+  const online = !!(API && KEY);
+  const HEADERS = { apikey: KEY, Authorization: "Bearer " + KEY, "Content-Type": "application/json" };
+  const known = new Set();
+  let loadedOnce = false;
+
+  function loadTokens() { try { return JSON.parse(localStorage.getItem("pigeon-tokens") || "{}"); } catch (_) { return {}; } }
+  function saveToken(id, tok) { const m = loadTokens(); m[id] = tok; try { localStorage.setItem("pigeon-tokens", JSON.stringify(m)); } catch (_) {} }
+  function randomToken() { const a = new Uint8Array(18); crypto.getRandomValues(a); return [...a].map(b => b.toString(16).padStart(2, "0")).join(""); }
+
+  function randomUuid() {
+    const a = new Uint8Array(16); crypto.getRandomValues(a);
+    a[6] = (a[6] & 15) | 64; a[8] = (a[8] & 63) | 128;
+    const h = [...a].map(b => b.toString(16).padStart(2, "0")).join("");
+    return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
+  }
+
+  function loadImg(src) {
+    return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+  }
+
+  async function addRow(row, opts) {
+    if (birds.has(row.id)) return;
+    if (typeof row.img !== "string" || !row.img.startsWith("data:image/")) return;
+    try {
+      const img = await loadImg(row.img);
+      if (!known.has(row.id)) return;
+      const mine = !!loadTokens()[row.id];
+      spawnBird(row.id, img, { artist: String(row.artist || "").slice(0, 40), t: Date.parse(row.created_at) || 0, mine }, opts);
+    } catch (_) {}
+  }
+
+  function updateCount() {
+    const n = [...birds.values()].filter(b => !b.meta.wild).length;
+    $("count").textContent = n === 0 ? "No drawn pigeons yet" : n === 1 ? "1 pigeon in the sky" : `${n} pigeons in the sky`;
+    if (!online) $("count").textContent += " · local preview";
+    $("empty").hidden = n !== 0;
+  }
+
+  async function sync() {
+    if (!online || document.hidden) return;
+    try {
+      const r = await fetch(`${API}/rest/v1/pigeons?select=id&order=created_at.desc&limit=200`, { headers: HEADERS });
+      if (!r.ok) throw new Error(r.status);
+      const ids = (await r.json()).map(x => x.id);
+      const live = new Set(ids);
+      for (const id of [...known]) {
+        if (!live.has(id) && !String(id).startsWith("local-")) {
+          known.delete(id); birds.delete(id);
+          if (selected && selected.id === id) select(null);
+        }
+      }
+      const fresh = ids.filter(id => !known.has(id));
+      if (fresh.length) {
+        fresh.forEach(id => known.add(id));
+        for (let i = 0; i < fresh.length; i += 40) {
+          const chunk = fresh.slice(i, i + 40);
+          const q = await fetch(`${API}/rest/v1/pigeons?select=id,img,artist,created_at&id=in.(${chunk.join(",")})`, { headers: HEADERS });
+          if (!q.ok) { chunk.forEach(id => known.delete(id)); continue; }
+          const first = !loadedOnce;
+          for (const row of await q.json()) await addRow(row, first ? {} : { x: Math.random() < 0.5 ? -80 : W + 80 });
+        }
+      }
+      loadedOnce = true;
+      updateCount();
+    } catch (_) {
+      $("count").textContent = "Can't reach the flock right now";
+    }
+  }
+
+  $("release").addEventListener("click", async () => {
+    const msg = $("msg");
+    const img = exportPigeon();
+    if (!img) { msg.textContent = "Draw a bit more before it can fly. A body, a head and a wing will do."; return; }
+    const artist = $("artist").value.trim().slice(0, 40);
+    if (!artist) { msg.textContent = "Sign your pigeon so people know who drew it."; $("artist").focus(); return; }
+    try { localStorage.setItem("pigeon-artist", artist); } catch (_) {}
+    const btn = $("release"); btn.disabled = true; msg.textContent = "";
+    try {
+      let id, t = Date.now();
+      if (online) {
+        const owner_token = randomToken();
+        id = crypto.randomUUID ? crypto.randomUUID() : randomUuid();
+        const r = await fetch(`${API}/rest/v1/pigeons`, {
+          method: "POST", headers: { ...HEADERS, Prefer: "return=minimal" },
+          body: JSON.stringify({ id, img, artist, owner_token }),
+        });
+        if (!r.ok) throw new Error(String(r.status));
+        saveToken(id, owner_token);
+      } else {
+        id = "local-" + t;
+      }
+      known.add(id);
+      const im = await loadImg(img);
+      const b = spawnBird(id, im, { artist, t, mine: true }, { x: -80, dir: 1, y: H * 0.45, boost: 160 });
+      strokes.length = 0; redraw();
+      closePad(); updateCount();
+      setTimeout(() => { if (birds.has(id)) select(b); }, 900);
+    } catch (e) {
+      msg.textContent = "Your pigeon didn't take off. Check your connection and try again.";
+    } finally { btn.disabled = false; }
+  });
+
+  $("tag-remove").addEventListener("click", async () => {
+    const b = selected; if (!b || b.meta.wild) return;
+    const tok = loadTokens()[b.id];
+    select(null);
+    birds.delete(b.id); known.delete(b.id); updateCount();
+    if (online && tok) {
+      try {
+        await fetch(`${API}/rest/v1/rpc/delete_pigeon`, { method: "POST", headers: HEADERS, body: JSON.stringify({ pid: b.id, token: tok }) });
+      } catch (_) {}
+    }
+  });
+
+  function connect() {
+    updateCount();
+    if (!online) return;
+    sync();
+    setInterval(sync, 20000);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) sync(); });
+  }
+
+  /* ---------- Boot ---------- */
+  resize(); seedClouds(); addWild();
+  addEventListener("resize", () => { resize(); });
+  requestAnimationFrame(frame);
+  connect();
+})();
+</script>
+</body>
+</html>
